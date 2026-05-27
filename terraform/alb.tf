@@ -5,6 +5,13 @@ resource "aws_security_group" "alb" {
   vpc_id      = aws_vpc.main.id
 
   ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
     from_port   = 8080
     to_port     = 8080
     protocol    = "tcp"
@@ -51,14 +58,14 @@ resource "aws_security_group" "frontend" {
 # Security Group for Backend
 resource "aws_security_group" "backend" {
   name        = "${var.project_name}-backend-sg"
-  description = "Allow traffic from frontend to backend"
+  description = "Allow traffic from ALB and frontend to backend"
   vpc_id      = aws_vpc.main.id
 
   ingress {
     from_port       = 8080
     to_port         = 8080
     protocol        = "tcp"
-    security_groups = [aws_security_group.frontend.id]
+    security_groups = [aws_security_group.alb.id, aws_security_group.frontend.id]
   }
 
   egress {
@@ -126,7 +133,7 @@ resource "aws_lb_target_group" "backend" {
   }
 }
 
-# ALB Listener for Frontend
+# ALB Listener for Frontend on port 80
 resource "aws_lb_listener" "frontend" {
   load_balancer_arn = aws_lb.main.arn
   port              = 80
@@ -135,6 +142,18 @@ resource "aws_lb_listener" "frontend" {
   default_action {
     type             = "forward"
     target_group_arn = aws_lb_target_group.frontend.arn
+  }
+}
+
+# ALB Listener for Backend on port 8080
+resource "aws_lb_listener" "backend" {
+  load_balancer_arn = aws_lb.main.arn
+  port              = 8080
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.backend.arn
   }
 }
 
@@ -152,17 +171,5 @@ resource "aws_lb_listener_rule" "backend" {
     path_pattern {
       values = ["/api/*"]
     }
-  }
-}
-
-# ALB Listener for Backend on port 8080
-resource "aws_lb_listener" "backend" {
-  load_balancer_arn = aws_lb.main.arn
-  port              = 8080
-  protocol          = "HTTP"
-
-  default_action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.backend.arn
   }
 }
