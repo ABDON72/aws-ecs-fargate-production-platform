@@ -1,59 +1,128 @@
-# Overview
-This repository contains a React frontend, and an Express backend that the frontend connects to.
+# AWS ECS Fargate CI/CD Pipeline
 
-# Objective
-Deploy the frontend and backend to somewhere publicly accessible over the internet. The AWS Free Tier should be more than sufficient to run this project, but you may use any platform and tooling you'd like for your solution.
+Automated CI/CD pipeline deploying containerized Node.js microservices to AWS ECS Fargate using Docker, Terraform, and Jenkins with auto-scaling.
 
-Fork this repo as a base. You may change any code in this repository to suit the infrastructure you build in this code challenge.
+## Architecture Overview
 
-# Submission
-1. A github repo that has been forked from this repo with all your code.
-2. Modify this README file with instructions for:
-* Any tools needed to deploy your infrastructure
-* All the steps needed to repeat your deployment process
-* URLs to the your deployed frontend.
+Developer → GitHub → Jenkins → ECR → ECS Fargate → ALB → User
 
-# Evaluation
-You will be evaluated on the ease to replicate your infrastructure. This is a combination of quality of the instructions, as well as any scripts to automate the overall setup process.
+## Tech Stack
 
-# Setup your environment
-Install nodejs. Binaries and installers can be found on nodejs.org.
-https://nodejs.org/en/download/
+| Tool | Purpose |
+|---|---|
+| Docker | Containerize frontend and backend apps |
+| Terraform | Provision all AWS infrastructure as code |
+| Jenkins | Automate CI/CD pipeline |
+| AWS ECS Fargate | Run containers without managing servers |
+| AWS ECR | Store Docker images |
+| AWS ALB | Load balance traffic to containers |
+| AWS VPC | Private network for all resources |
+| Auto Scaling | Scale containers based on CPU usage |
 
-For macOS or Linux, Nodejs can usually be found in your preferred package manager.
-https://nodejs.org/en/download/package-manager/
+## Project Structure
 
-Depending on the Linux distribution, the Node Package Manager `npm` may need to be installed separately.
+frontend/ - React frontend app with Dockerfile
+backend/ - Node.js backend API with Dockerfile
+terraform/ - AWS infrastructure as code
+Jenkinsfile - CI/CD pipeline definition
 
-# Running the project
-The backend and the frontend will need to run on separate processes. The backend should be started first.
-```
-cd backend
-npm ci
-npm start
-```
-The backend should response to a GET request on `localhost:8080`.
+## Phase 1 — Local Setup
 
-With the backend started, the frontend can be started.
-```
-cd frontend
-npm ci
-npm start
-```
-The frontend can be accessed at `localhost:3000`. If the frontend successfully connects to the backend, a message saying "SUCCESS" followed by a guid should be displayed on the screen.  If the connection failed, an error message will be displayed on the screen.
+Prerequisites: Node.js v18+, Git
 
-# Configuration
-The frontend has a configuration file at `frontend/src/config.js` that defines the URL to call the backend. This URL is used on `frontend/src/App.js#12`, where the front end will make the GET call during the initial load of the page.
+git clone https://github.com/ABDON72/aws-ecs-fargate-cicd-pipeline.git
+cd aws-ecs-fargate-cicd-pipeline
+cd backend && npm install && npm start
+cd frontend && npm install && npm start
+Open http://localhost:3000
 
-The backend has a configuration file at `backend/config.js` that defines the host that the frontend will be calling from. This URL is used in the `Access-Control-Allow-Origin` CORS header, read in `backend/index.js#14`
+## Phase 2 — Docker Setup
 
-# Optional Extras
-The core requirement for this challenge is to get the provided application up and running for consumption over the public internet. That being said, there are some opportunities in this code challenge to demonstrate your skill sets that are above and beyond the core requirement.
+Prerequisites: Docker
 
-A few examples of extras for this coding challenge:
-1. Dockerizing the application
-2. Scripts to set up the infrastructure
-3. Providing a pipeline for the application deployment
-4. Running the application in a serverless environment
+docker network create app-network
+docker build -t backend:latest ./backend
+docker run -d --name backend --network app-network -p 8080:8080 backend:latest
+docker build -t frontend:latest ./frontend
+docker run -d --name frontend --network app-network -p 3000:3000 frontend:latest
+Open http://localhost:3000
 
-This is not an exhaustive list of extra features that could be added to this code challenge. At the end of the day, this section is for you to demonstrate any skills you want to show that’s not captured in the core requirement.
+## Phase 3 — Terraform Infrastructure
+
+Prerequisites: Terraform v1.0+, AWS CLI configured
+
+cd terraform
+terraform init
+terraform plan
+terraform apply -auto-approve
+
+Resources created:
+- VPC with public and private subnets
+- Internet Gateway and NAT Gateway
+- ECS Fargate cluster
+- ECR repositories for frontend and backend
+- Application Load Balancer
+- IAM roles and security groups
+- Auto Scaling policies trigger at 50% CPU
+
+## Phase 4 — Jenkins Setup
+
+Jenkins Infrastructure:
+- EC2 instance type: t3.medium
+- OS: Ubuntu 22.04
+- Jenkins runs as Docker container
+- Security group: port 22 SSH and 8080 Jenkins UI
+
+Jenkins URL: http://44.198.161.151:8080
+
+Required plugins:
+- Docker Pipeline
+- Amazon ECR
+- AWS Credentials
+- Pipeline AWS Steps
+
+## Phase 5 — CI/CD Pipeline
+
+Jenkinsfile stages:
+- Checkout: Pull latest code from GitHub
+- Build Docker Images: Build frontend and backend images
+- Push to ECR: Push images to AWS ECR
+- Deploy to ECS: Force new ECS deployment
+- Validate Deployment: Confirm services are stable
+
+## Phase 6 — Deployment Validation
+
+Live application URL: http://ecs-fargate-cicd-alb-1845797115.us-east-1.elb.amazonaws.com
+
+Validation:
+- Frontend loads successfully
+- Backend returns SUCCESS + GUID
+- End-to-end communication confirmed
+
+## Phase 6.5 — Load Testing and Auto Scaling
+
+Load test command:
+siege -c 200 -t 10M http://ecs-fargate-cicd-alb-1845797115.us-east-1.elb.amazonaws.com
+
+Results:
+- CPU spiked to 99.9% under load
+- Auto Scaling triggered at 50% CPU threshold
+- ECS scaled frontend from 1 to 2 tasks automatically
+- Application remained available during scaling
+- Availability: 99.82%
+
+Auto Scaling configuration:
+- Minimum tasks: 1
+- Maximum tasks: 4
+- Scale out trigger: 50% CPU
+- Scale out cooldown: 60 seconds
+- Scale in cooldown: 300 seconds
+
+## Key DevOps Principles
+
+- SCM-first: Jenkinsfile and Dockerfiles version controlled in GitHub
+- Infrastructure as Code: Terraform for reproducible infrastructure
+- Automation: Jenkins CI/CD pipeline
+- Containerization: Docker for consistency across environments
+- Serverless compute: ECS with Fargate no EC2 nodes to manage
+- Auto Scaling: Load tested and validated
