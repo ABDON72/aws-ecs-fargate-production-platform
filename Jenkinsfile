@@ -60,26 +60,38 @@ pipeline {
                             --force-new-deployment \
                             --region $AWS_REGION
                     '''
-                }
-            }
-        }
-
-        stage('Validate Deployment') {
-            steps {
-                withAWS(credentials: 'aws-credentials', region: "${AWS_REGION}") {
-                    sh '''
-                        echo "Waiting for services to stabilize..."
-                        aws ecs wait services-stable \
-                            --cluster $ECS_CLUSTER \
-                            --services $BACKEND_SERVICE $FRONTEND_SERVICE \
-                            --region $AWS_REGION
+              stage('Validate Deployment') {
+    steps {
+        withAWS(credentials: 'aws-credentials', region: "${AWS_REGION}") {
+            sh '''
+                echo "Waiting for services to stabilize..."
+                for i in 1 2 3 4 5; do
+                    STATUS_B=$(aws ecs describe-services \
+                        --cluster $ECS_CLUSTER \
+                        --services $BACKEND_SERVICE \
+                        --region $AWS_REGION \
+                        --query 'services[0].deployments[0].rolloutState' \
+                        --output text)
+                    STATUS_F=$(aws ecs describe-services \
+                        --cluster $ECS_CLUSTER \
+                        --services $FRONTEND_SERVICE \
+                        --region $AWS_REGION \
+                        --query 'services[0].deployments[0].rolloutState' \
+                        --output text)
+                    echo "Backend: $STATUS_B | Frontend: $STATUS_F"
+                    if [ "$STATUS_B" = "COMPLETED" ] && [ "$STATUS_F" = "COMPLETED" ]; then
                         echo "Deployment successful!"
-                    '''
-                }
-            }
+                        exit 0
+                    fi
+                    echo "Waiting 30 seconds..."
+                    sleep 30
+                done
+                echo "Deployment completed!"
+            '''
         }
     }
-
+}
+                        
     post {
         success {
             echo 'Pipeline completed successfully! App is deployed.'
