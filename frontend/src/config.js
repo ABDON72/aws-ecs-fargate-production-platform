@@ -1,2 +1,2 @@
-export const API_URL = 'http://172.26.175.128:8080/'
+export const API_URL = 'http://ecs-fargate-cicd-alb-1990167334.us-east-1.elb.amazonaws.com/'
 export default API_URL
