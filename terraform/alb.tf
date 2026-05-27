@@ -5,8 +5,8 @@ resource "aws_security_group" "alb" {
   vpc_id      = aws_vpc.main.id
 
   ingress {
-    from_port   = 80
-    to_port     = 80
+    from_port   = 8080
+    to_port     = 8080
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
@@ -152,5 +152,17 @@ resource "aws_lb_listener_rule" "backend" {
     path_pattern {
       values = ["/api/*"]
     }
+  }
+}
+
+# ALB Listener for Backend on port 8080
+resource "aws_lb_listener" "backend" {
+  load_balancer_arn = aws_lb.main.arn
+  port              = 8080
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.backend.arn
   }
 }
