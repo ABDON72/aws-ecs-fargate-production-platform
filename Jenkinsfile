@@ -2,14 +2,12 @@ pipeline {
     agent any
 
     environment {
-        AWS_REGION         = 'us-east-1'
-        ECR_BACKEND        = '795644302799.dkr.ecr.us-east-1.amazonaws.com/ecs-fargate-cicd-backend'
-        ECR_FRONTEND       = '795644302799.dkr.ecr.us-east-1.amazonaws.com/ecs-fargate-cicd-frontend'
-        ECS_CLUSTER        = 'ecs-fargate-cicd-cluster'
-        BACKEND_SERVICE    = 'ecs-fargate-cicd-backend-service'
-        FRONTEND_SERVICE   = 'ecs-fargate-cicd-frontend-service'
-        BACKEND_FAMILY     = 'ecs-fargate-cicd-backend'
-        FRONTEND_FAMILY    = 'ecs-fargate-cicd-frontend'
+        AWS_REGION      = 'us-east-1'
+        ECR_BACKEND     = '795644302799.dkr.ecr.us-east-1.amazonaws.com/ecs-fargate-cicd-backend'
+        ECR_FRONTEND    = '795644302799.dkr.ecr.us-east-1.amazonaws.com/ecs-fargate-cicd-frontend'
+        ECS_CLUSTER     = 'ecs-fargate-cicd-cluster'
+        BACKEND_SERVICE = 'ecs-fargate-cicd-backend-service'
+        FRONTEND_SERVICE= 'ecs-fargate-cicd-frontend-service'
     }
 
     stages {
@@ -34,7 +32,6 @@ pipeline {
                         aws ecr get-login-password --region $AWS_REGION | \
                         docker login --username AWS --password-stdin \
                         795644302799.dkr.ecr.us-east-1.amazonaws.com
-
                         docker push $ECR_BACKEND:latest
                         docker push $ECR_FRONTEND:latest
                     '''
@@ -46,52 +43,49 @@ pipeline {
             steps {
                 withAWS(credentials: 'aws-credentials', region: "${AWS_REGION}") {
                     sh '''
-                        # Force new deployment for backend
                         aws ecs update-service \
                             --cluster $ECS_CLUSTER \
                             --service $BACKEND_SERVICE \
                             --force-new-deployment \
                             --region $AWS_REGION
 
-                        # Force new deployment for frontend
                         aws ecs update-service \
                             --cluster $ECS_CLUSTER \
                             --service $FRONTEND_SERVICE \
                             --force-new-deployment \
                             --region $AWS_REGION
                     '''
-              stage('Validate Deployment') {
-    steps {
-        withAWS(credentials: 'aws-credentials', region: "${AWS_REGION}") {
-            sh '''
-                echo "Waiting for services to stabilize..."
-                for i in 1 2 3 4 5; do
-                    STATUS_B=$(aws ecs describe-services \
-                        --cluster $ECS_CLUSTER \
-                        --services $BACKEND_SERVICE \
-                        --region $AWS_REGION \
-                        --query 'services[0].deployments[0].rolloutState' \
-                        --output text)
-                    STATUS_F=$(aws ecs describe-services \
-                        --cluster $ECS_CLUSTER \
-                        --services $FRONTEND_SERVICE \
-                        --region $AWS_REGION \
-                        --query 'services[0].deployments[0].rolloutState' \
-                        --output text)
-                    echo "Backend: $STATUS_B | Frontend: $STATUS_F"
-                    if [ "$STATUS_B" = "COMPLETED" ] && [ "$STATUS_F" = "COMPLETED" ]; then
-                        echo "Deployment successful!"
-                        exit 0
-                    fi
-                    echo "Waiting 30 seconds..."
-                    sleep 30
-                done
-                echo "Deployment completed!"
-            '''
+                }
+            }
+        }
+
+        stage('Validate Deployment') {
+            steps {
+                withAWS(credentials: 'aws-credentials', region: "${AWS_REGION}") {
+                    sh '''
+                        echo "Waiting for services to stabilize..."
+                        sleep 60
+                        STATUS_B=$(aws ecs describe-services \
+                            --cluster $ECS_CLUSTER \
+                            --services $BACKEND_SERVICE \
+                            --region $AWS_REGION \
+                            --query 'services[0].deployments[0].rolloutState' \
+                            --output text)
+                        STATUS_F=$(aws ecs describe-services \
+                            --cluster $ECS_CLUSTER \
+                            --services $FRONTEND_SERVICE \
+                            --region $AWS_REGION \
+                            --query 'services[0].deployments[0].rolloutState' \
+                            --output text)
+                        echo "Backend status: $STATUS_B"
+                        echo "Frontend status: $STATUS_F"
+                        echo "Deployment complete!"
+                    '''
+                }
+            }
         }
     }
-}
-                        
+
     post {
         success {
             echo 'Pipeline completed successfully! App is deployed.'
